@@ -48,14 +48,39 @@ mod tests {
     use crate::once_mut;
 
     once_mut! {
+        static mut SIMPLE: i32 = 123;
+    }
+
+    #[test]
+    fn simple() {
+        let value_mut = SIMPLE.take().unwrap();
+        assert_eq!(*value_mut, 123);
+        assert!(SIMPLE.take().is_none());
+        *value_mut = 321;
+        assert_eq!(*value_mut, 321);
+    }
+
+    once_mut! {
         static mut ONE: i32 = 1;
         static mut TWO: i32 = 2;
     }
 
     #[test]
-    fn it_works() {
+    fn multiple() {
         assert_eq!(*ONE.take().unwrap(), 1);
         assert!(ONE.take().is_none());
         assert_eq!(*TWO.take().unwrap(), 2);
+    }
+
+    mod outer {
+        once_mut! {
+            pub static mut INNER: i32 = -1;
+        }
+    }
+
+    #[test]
+    fn visibility() {
+        assert_eq!(*outer::INNER.take().unwrap(), -1);
+        assert!(outer::INNER.take().is_none());
     }
 }
