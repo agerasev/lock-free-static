@@ -1,4 +1,4 @@
-use crate::OnceBase;
+use crate::UnsafeOnceCell;
 use core::{
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, Ordering},
@@ -6,12 +6,12 @@ use core::{
 
 /// Lock-free thread-safe cell which can mutably borrowed only once.
 pub struct OnceMut<T> {
-    base: OnceBase<T>,
+    base: UnsafeOnceCell<T>,
     borrowed: AtomicBool,
 }
 
 impl<T> Deref for OnceMut<T> {
-    type Target = OnceBase<T>;
+    type Target = UnsafeOnceCell<T>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
@@ -25,7 +25,7 @@ impl<T> DerefMut for OnceMut<T> {
 impl<T> OnceMut<T> {
     pub const fn new() -> Self {
         Self {
-            base: OnceBase::new(),
+            base: UnsafeOnceCell::new(),
             borrowed: AtomicBool::new(false),
         }
     }
@@ -58,53 +58,21 @@ impl<T> OnceMut<T> {
     }
 }
 
-#[macro_export]
-macro_rules! once_mut {
-    ($(#[$attr:meta])* $vis:vis static mut $ident:ident: $ty:ty = $expr:expr; $($next:tt)*) => {
-        $(#[$attr])*
-        $vis static $ident: $crate::OnceInit<$ty, $crate::OnceMut<$ty>>
-            = $crate::OnceInit::new($crate::OnceMut::new(), || $expr);
-        $crate::once_mut!($($next)*);
-    };
-    () => {};
-}
-
 #[cfg(test)]
 mod tests {
-    once_mut! {
-        static mut SIMPLE: i32 = 123;
-    }
+    use super::OnceMut;
 
     #[test]
-    fn simple() {
-        let value_mut = SIMPLE.get_mut().unwrap();
+    fn set_get_mut() {
+        let cell = OnceMut::<i32>::new();
+        assert!(cell.get_mut().is_none());
+
+        cell.set(123).unwrap();
+
+        let value_mut = cell.get_mut().unwrap();
         assert_eq!(*value_mut, 123);
-        assert!(SIMPLE.get_mut().is_none());
+        assert!(cell.get_mut().is_none());
         *value_mut = 321;
         assert_eq!(*value_mut, 321);
-    }
-
-    once_mut! {
-        static mut ONE: i32 = 1;
-        static mut TWO: i32 = 2;
-    }
-
-    #[test]
-    fn multiple() {
-        assert_eq!(*ONE.get_mut().unwrap(), 1);
-        assert!(ONE.get_mut().is_none());
-        assert_eq!(*TWO.get_mut().unwrap(), 2);
-    }
-
-    mod outer {
-        once_mut! {
-            pub static mut INNER: i32 = -1;
-        }
-    }
-
-    #[test]
-    fn visibility() {
-        assert_eq!(*outer::INNER.get_mut().unwrap(), -1);
-        assert!(outer::INNER.get_mut().is_none());
     }
 }

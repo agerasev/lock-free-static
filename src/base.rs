@@ -22,16 +22,16 @@ impl<F: FnOnce()> Drop for Defer<F> {
     }
 }
 
-pub struct OnceBase<T> {
+pub struct UnsafeOnceCell<T> {
     slot: UnsafeCell<MaybeUninit<T>>,
     lock: AtomicBool,
     init: AtomicBool,
 }
 
-unsafe impl<T: Send> Send for OnceBase<T> {}
-unsafe impl<T: Send + Sync> Sync for OnceBase<T> {}
+unsafe impl<T: Send> Send for UnsafeOnceCell<T> {}
+unsafe impl<T: Send + Sync> Sync for UnsafeOnceCell<T> {}
 
-impl<T> OnceBase<T> {
+impl<T> UnsafeOnceCell<T> {
     /// Creates a new empty cell.
     pub const fn new() -> Self {
         Self {
@@ -70,7 +70,7 @@ impl<T> OnceBase<T> {
 
     /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
     ///
-    /// Returns `None` if the cell is being initialized.
+    /// Returns `Err(ctor)` back if the cell is already being initialized.
     ///
     /// # Panics
     ///
@@ -108,11 +108,11 @@ impl<T> OnceBase<T> {
     }
 }
 
-impl<T> Drop for OnceBase<T> {
+impl<T> Drop for UnsafeOnceCell<T> {
     fn drop(&mut self) {
         drop(self.take());
     }
 }
 
-impl<T: UnwindSafe> UnwindSafe for OnceBase<T> {}
-impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for OnceBase<T> {}
+impl<T: UnwindSafe> UnwindSafe for UnsafeOnceCell<T> {}
+impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for UnsafeOnceCell<T> {}

@@ -1,13 +1,13 @@
-use crate::OnceBase;
+use crate::UnsafeOnceCell;
 use core::ops::{Deref, DerefMut};
 
 /// Lock-free thread-safe cell which can be written to only once.
 pub struct OnceCell<T> {
-    base: OnceBase<T>,
+    base: UnsafeOnceCell<T>,
 }
 
 impl<T> Deref for OnceCell<T> {
-    type Target = OnceBase<T>;
+    type Target = UnsafeOnceCell<T>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
@@ -22,7 +22,7 @@ impl<T> OnceCell<T> {
     /// Creates a new empty cell.
     pub const fn new() -> Self {
         Self {
-            base: OnceBase::new(),
+            base: UnsafeOnceCell::new(),
         }
     }
 
@@ -64,7 +64,7 @@ mod tests {
     use super::OnceCell;
 
     #[test]
-    fn set() {
+    fn set_get() {
         let mut cell = OnceCell::<i32>::new();
         assert!(cell.get().is_none());
 
