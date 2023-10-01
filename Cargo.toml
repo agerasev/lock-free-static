@@ -1,13 +1,13 @@
 [package]
-name = "once_mut"
+name = "lock-free-static"
 version = "0.1.0"
 edition = "2021"
 authors = ["Alexey Gerasev <alexey.gerasev@gmail.com>"]
-description = "Safe mutable reference to static variable that can be obtained only once"
-documentation = "https://docs.rs/ringbuf"
-homepage = "https://github.com/agerasev/once_mut"
-repository = "https://github.com/agerasev/once_mut.git"
+description = "Lock-free static variables"
+documentation = "https://docs.rs/lock-free-static"
+homepage = "https://gitlab.com/agerasev/lock-free-static"
+repository = "https://gitlab.com/agerasev/lock-free-static.git"
 readme = "README.md"
 license = "MIT/Apache-2.0"
-keywords = ["static", "lazy", "once", "mutable", "mut"]
+keywords = ["lock-free", "static", "lazy", "once"]
 categories = ["concurrency", "data-structures", "no-std"]

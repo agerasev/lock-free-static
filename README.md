@@ -1,21 +1,21 @@
-# once_mut
+# lock-free-static
 
 [![Crates.io][crates_badge]][crates]
 [![Docs.rs][docs_badge]][docs]
-[![Github Actions][github_badge]][github]
+[![Gitlab CI][gitlab_badge]][gitlab]
 [![License][license_badge]][license]
 
-[crates_badge]: https://img.shields.io/crates/v/once_mut.svg
-[docs_badge]: https://docs.rs/once_mut/badge.svg
-[github_badge]: https://github.com/agerasev/once_mut/actions/workflows/test.yml/badge.svg
-[license_badge]: https://img.shields.io/crates/l/once_mut.svg
+[crates_badge]: https://img.shields.io/crates/v/lock-free-static.svg
+[docs_badge]: https://docs.rs/lock-free-static/badge.svg
+[gitlab_badge]: https://gitlab.com/agerasev/lock-free-static/badges/master/pipeline.svg
+[license_badge]: https://img.shields.io/crates/l/lock-free-static.svg
 
-[crates]: https://crates.io/crates/once_mut
-[docs]: https://docs.rs/once_mut
-[github]: https://github.com/agerasev/once_mut/actions/workflows/test.yml
+[crates]: https://crates.io/crates/lock-free-static
+[docs]: https://docs.rs/lock-free-static
+[gitlab]: https://gitlab.com/agerasev/lock-free-static/-/pipelines?scope=branches&ref=master
 [license]: #license
 
-Safe mutable reference to static variable that can be obtained only once.
+Lock-free static variables.
 
 ## License
 
