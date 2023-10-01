@@ -1,45 +1,28 @@
-use crate::Defer;
-use core::{
-    cell::UnsafeCell,
-    mem::{forget, MaybeUninit},
-    panic::{RefUnwindSafe, UnwindSafe},
-    ptr,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use crate::OnceBase;
+use core::ops::{Deref, DerefMut};
 
 /// Lock-free thread-safe cell which can be written to only once.
 pub struct OnceCell<T> {
-    slot: UnsafeCell<MaybeUninit<T>>,
-    lock: AtomicBool,
-    init: AtomicBool,
+    base: OnceBase<T>,
 }
 
-unsafe impl<T: Send> Send for OnceCell<T> {}
-unsafe impl<T: Send + Sync> Sync for OnceCell<T> {}
+impl<T> Deref for OnceCell<T> {
+    type Target = OnceBase<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+impl<T> DerefMut for OnceCell<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
 
 impl<T> OnceCell<T> {
     /// Creates a new empty cell.
     pub const fn new() -> Self {
         Self {
-            slot: UnsafeCell::new(MaybeUninit::uninit()),
-            lock: AtomicBool::new(false),
-            init: AtomicBool::new(false),
-        }
-    }
-
-    /// Sets the contents of this cell to `value`.
-    ///
-    /// Returns `Ok(())` if the cell’s value was set by this call.
-    ///
-    /// The cell is guaranteed to contain a value when `set` returns `Ok(())`.
-    pub fn set(&self, value: T) -> Result<(), T> {
-        if self.lock.swap(true, Ordering::AcqRel) {
-            Err(value)
-        } else {
-            let slot = unsafe { &mut *self.slot.get() };
-            *slot = MaybeUninit::new(value);
-            self.init.store(true, Ordering::Release);
-            Ok(())
+            base: OnceBase::new(),
         }
     }
 
@@ -47,22 +30,14 @@ impl<T> OnceCell<T> {
     ///
     /// Returns `None` if the cell is empty, or being initialized.
     pub fn get(&self) -> Option<&T> {
-        if self.init.load(Ordering::Acquire) {
-            Some(unsafe { (*self.slot.get()).assume_init_ref() })
-        } else {
-            None
-        }
+        self.base.get_ptr().map(|p| unsafe { &*p })
     }
 
     /// Gets the mutable reference to the underlying value.
     ///
     /// Returns `None` if the cell is empty.
     pub fn get_mut(&mut self) -> Option<&mut T> {
-        if self.init.load(Ordering::Relaxed) {
-            Some(unsafe { (*self.slot.get()).assume_init_mut() })
-        } else {
-            None
-        }
+        self.base.get_ptr().map(|p| unsafe { &mut *p })
     }
 
     /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
@@ -72,36 +47,8 @@ impl<T> OnceCell<T> {
     /// # Panics
     ///
     /// If `ctor` panics, the panic is propagated to the caller, and the cell remains uninitialized.
-    pub fn get_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Option<&T> {
-        if self.lock.swap(true, Ordering::AcqRel) {
-            if self.init.load(Ordering::Acquire) {
-                Some(unsafe { (*self.slot.get()).assume_init_ref() })
-            } else {
-                None
-            }
-        } else {
-            let unlock = Defer::new(|| self.lock.store(false, Ordering::Release));
-            let value = ctor();
-            forget(unlock);
-
-            let slot = unsafe { &mut *self.slot.get() };
-            *slot = MaybeUninit::new(value);
-            self.init.store(true, Ordering::Release);
-
-            Some(unsafe { slot.assume_init_ref() })
-        }
-    }
-
-    /// Takes the value out of this cell, moving it back to an uninitialized state.
-    ///
-    /// Has no effect and returns `None` if the cell hasn’t been initialized.
-    pub fn take(&mut self) -> Option<T> {
-        if self.init.swap(false, Ordering::Relaxed) {
-            self.lock.store(false, Ordering::Relaxed);
-            Some(unsafe { ptr::read(self.slot.get()).assume_init() })
-        } else {
-            None
-        }
+    pub fn get_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Result<&T, F> {
+        self.base.get_ptr_or_init(ctor).map(|p| unsafe { &*p })
     }
 
     /// Consumes the cell, returning the wrapped value.
@@ -111,15 +58,6 @@ impl<T> OnceCell<T> {
         self.take()
     }
 }
-
-impl<T> Drop for OnceCell<T> {
-    fn drop(&mut self) {
-        drop(self.take());
-    }
-}
-
-impl<T: UnwindSafe> UnwindSafe for OnceCell<T> {}
-impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for OnceCell<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -165,8 +103,8 @@ mod tests {
     fn get_or_init() {
         let cell = OnceCell::<i32>::new();
 
-        assert_eq!(*cell.get_or_init(|| 123).unwrap(), 123);
-        assert_eq!(*cell.get_or_init(|| 321).unwrap(), 123);
+        assert_eq!(*cell.get_or_init(|| 123).ok().unwrap(), 123);
+        assert_eq!(*cell.get_or_init(|| 321).ok().unwrap(), 123);
     }
 
     #[test]
@@ -178,7 +116,8 @@ mod tests {
 
         assert_eq!(
             *catch_unwind(|| cell.get_or_init(|| panic!("abc")))
-                .unwrap_err()
+                .err()
+                .unwrap()
                 .downcast::<&'static str>()
                 .unwrap(),
             "abc"
