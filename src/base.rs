@@ -22,6 +22,7 @@ impl<F: FnOnce()> Drop for Defer<F> {
     }
 }
 
+/// Lock-free hybrid of [`UnsafeCell`] and [`std::sync::OnceLock`].
 pub struct UnsafeOnceCell<T> {
     slot: UnsafeCell<MaybeUninit<T>>,
     lock: AtomicBool,

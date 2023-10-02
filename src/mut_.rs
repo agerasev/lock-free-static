@@ -4,7 +4,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-/// Mutable variant of [`OnceCell`](crate::OnceCell) which can be borrowed only once.
+/// Like [`OnceCell`](crate::OnceCell) but with exclusive mutable access to its content.
 pub struct OnceMut<T> {
     base: UnsafeOnceCell<T>,
     borrowed: AtomicBool,
