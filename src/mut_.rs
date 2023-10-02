@@ -4,7 +4,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-/// Lock-free thread-safe cell which can mutably borrowed only once.
+/// Mutable variant of [`OnceCell`](crate::OnceCell) which can be borrowed only once.
 pub struct OnceMut<T> {
     base: UnsafeOnceCell<T>,
     borrowed: AtomicBool,
@@ -23,6 +23,7 @@ impl<T> DerefMut for OnceMut<T> {
 }
 
 impl<T> OnceMut<T> {
+    /// Creates a new empty cell.
     pub const fn new() -> Self {
         Self {
             base: UnsafeOnceCell::new(),
@@ -30,19 +31,11 @@ impl<T> OnceMut<T> {
         }
     }
 
-    pub fn get_mut_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Result<&mut T, F> {
-        if self.borrowed.swap(true, Ordering::AcqRel) {
-            Err(ctor)
-        } else {
-            match self.base.get_ptr_or_init(ctor) {
-                Ok(ptr) => Ok(unsafe { &mut *ptr }),
-                Err(ctor) => {
-                    self.borrowed.store(false, Ordering::Release);
-                    Err(ctor)
-                }
-            }
-        }
-    }
+    /// Gets the mutable reference to the underlying value.
+    ///
+    /// The main difference from [`OnceCell::get_mut`](`crate::OnceCell::get_mut`) is that `self` is taken as immutable.
+    ///
+    /// After this call returns `Some(...)`, all subsequent calls will return `None`, and there is no way to obtain mutable reference again.
     pub fn get_mut(&self) -> Option<&mut T> {
         if self.borrowed.swap(true, Ordering::AcqRel) {
             None
@@ -56,6 +49,71 @@ impl<T> OnceMut<T> {
             }
         }
     }
+
+    /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
+    ///
+    /// Returns `None` if the cell is being currently initialized.
+    ///
+    /// See [`get_mut`](Self::get_mut) for more details.
+    ///
+    /// # Panics
+    ///
+    /// If `ctor` panics, the panic is propagated to the caller, and the cell remains uninitialized.
+    pub fn get_mut_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Result<&mut T, F> {
+        if self.borrowed.swap(true, Ordering::AcqRel) {
+            Err(ctor)
+        } else {
+            match self.base.get_ptr_or_init(ctor) {
+                Ok(ptr) => Ok(unsafe { &mut *ptr }),
+                Err(ctor) => {
+                    self.borrowed.store(false, Ordering::Release);
+                    Err(ctor)
+                }
+            }
+        }
+    }
+
+    /// Gets a guarded mutable reference to the underlying value.
+    ///
+    /// Only one guard of the same value can exist at the same time.
+    pub fn lock(&self) -> Option<LockGuard<'_, T>> {
+        if self.borrowed.swap(true, Ordering::AcqRel) {
+            None
+        } else {
+            match self.base.get_ptr() {
+                Some(ptr) => Some(LockGuard {
+                    value: ptr,
+                    owner: self,
+                }),
+                None => {
+                    self.borrowed.store(false, Ordering::Release);
+                    None
+                }
+            }
+        }
+    }
+}
+
+/// [`OnceMut`] lock guard.
+pub struct LockGuard<'a, T> {
+    owner: &'a OnceMut<T>,
+    value: *mut T,
+}
+impl<'a, T> Deref for LockGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.value }
+    }
+}
+impl<'a, T> DerefMut for LockGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.value }
+    }
+}
+impl<'a, T> Drop for LockGuard<'a, T> {
+    fn drop(&mut self) {
+        self.owner.borrowed.store(false, Ordering::Release);
+    }
 }
 
 #[cfg(test)]
@@ -63,7 +121,7 @@ mod tests {
     use super::OnceMut;
 
     #[test]
-    fn set_get_mut() {
+    fn get_mut() {
         let cell = OnceMut::<i32>::new();
         assert!(cell.get_mut().is_none());
 
@@ -74,5 +132,22 @@ mod tests {
         assert!(cell.get_mut().is_none());
         *value_mut = 321;
         assert_eq!(*value_mut, 321);
+    }
+
+    #[test]
+    fn lock() {
+        let cell = OnceMut::<i32>::new();
+        assert!(cell.lock().is_none());
+
+        cell.set(123).unwrap();
+
+        let mut guard = cell.lock().unwrap();
+        assert_eq!(*guard, 123);
+        assert!(cell.lock().is_none());
+        *guard = 321;
+        assert_eq!(*guard, 321);
+        drop(guard);
+
+        assert_eq!(*cell.lock().unwrap(), 321);
     }
 }

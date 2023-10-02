@@ -10,17 +10,26 @@ impl<T, D: Deref<Target = UnsafeOnceCell<T>>> LockFreeStatic<T, D> {
     pub const fn new(base: D, ctor: fn() -> T) -> Self {
         Self { base, ctor }
     }
+    pub fn init(&self) -> bool {
+        self.base.set((self.ctor)()).is_ok()
+    }
 }
 
 impl<T> LockFreeStatic<T, OnceCell<T>> {
-    pub fn get(&self) -> Option<&T> {
+    pub fn get_or_init(&self) -> Option<&T> {
         self.base.get_or_init(self.ctor).ok()
+    }
+    pub fn get(&self) -> Option<&T> {
+        self.base.get()
     }
 }
 
 impl<T> LockFreeStatic<T, OnceMut<T>> {
-    pub fn get_mut(&self) -> Option<&mut T> {
+    pub fn get_mut_or_init(&self) -> Option<&mut T> {
         self.base.get_mut_or_init(self.ctor).ok()
+    }
+    pub fn get_mut(&self) -> Option<&mut T> {
+        self.base.get_mut()
     }
 }
 
@@ -51,6 +60,9 @@ mod tests {
 
     #[test]
     fn const_() {
+        assert!(CONST.get().is_none());
+        assert!(CONST.init());
+
         let value = CONST.get().unwrap();
         assert_eq!(*value, 123);
         assert_eq!(*CONST.get().unwrap(), 123);
@@ -62,6 +74,9 @@ mod tests {
 
     #[test]
     fn mut_() {
+        assert!(MUT.get_mut().is_none());
+        assert!(MUT.init());
+
         let value_mut = MUT.get_mut().unwrap();
         assert_eq!(*value_mut, 123);
         assert!(MUT.get_mut().is_none());
@@ -76,10 +91,10 @@ mod tests {
 
     #[test]
     fn multiple() {
-        assert_eq!(*ONE.get().unwrap(), 1);
-        assert_eq!(*ONE.get().unwrap(), 1);
-        assert_eq!(*TWO.get_mut().unwrap(), 2);
-        assert!(TWO.get_mut().is_none());
+        assert_eq!(*ONE.get_or_init().unwrap(), 1);
+        assert_eq!(*ONE.get_or_init().unwrap(), 1);
+        assert_eq!(*TWO.get_mut_or_init().unwrap(), 2);
+        assert!(TWO.get_mut_or_init().is_none());
     }
 
     mod outer {
@@ -93,7 +108,7 @@ mod tests {
 
     #[test]
     fn visibility() {
-        assert_eq!(*outer::ONE.get().unwrap(), 1);
-        assert_eq!(*outer::TWO.get_mut().unwrap(), 2);
+        assert_eq!(*outer::ONE.get_or_init().unwrap(), 1);
+        assert_eq!(*outer::TWO.get_mut_or_init().unwrap(), 2);
     }
 }

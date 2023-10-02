@@ -42,7 +42,7 @@ impl<T> OnceCell<T> {
 
     /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
     ///
-    /// Returns `None` if the cell is being initialized.
+    /// Returns `None` if the cell is being currently initialized.
     ///
     /// # Panics
     ///
@@ -64,7 +64,7 @@ mod tests {
     use super::OnceCell;
 
     #[test]
-    fn set_get() {
+    fn get() {
         let mut cell = OnceCell::<i32>::new();
         assert!(cell.get().is_none());
 

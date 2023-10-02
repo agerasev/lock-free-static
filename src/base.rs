@@ -70,7 +70,7 @@ impl<T> UnsafeOnceCell<T> {
 
     /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
     ///
-    /// Returns `Err(ctor)` back if the cell is already being initialized.
+    /// Returns `None` if the cell is being currently initialized.
     ///
     /// # Panics
     ///
