@@ -1,27 +1,31 @@
 //! ## Examples
 //!
-//! ### Static cell
+//! ### Static variable
 //!
 //! ```
-//! # use lock_free_static::OnceCell;
+//! # use lock_free_static::lock_free_static;
 //! #
-//! static VAR: OnceCell<i32> = OnceCell::new();
+//! lock_free_static!{
+//!     static VAR: i32 = 123;
+//! }
 //!
 //! fn main() {
-//!     VAR.set(123).unwrap();
+//!     assert!(VAR.init());
 //!     assert_eq!(*VAR.get().unwrap(), 123);
 //! }
 //! ```
 //!
-//! ### Mutable static cell
+//! ### Mutable static variable
 //!
 //! ```
-//! # use lock_free_static::OnceMut;
+//! # use lock_free_static::lock_free_static;
 //! #
-//! static VAR: OnceMut<i32> = OnceMut::new();
+//! lock_free_static!{
+//!     static mut VAR: i32 = 123;
+//! }
 //!
 //! fn main() {
-//!     VAR.set(123).unwrap();
+//!     assert!(VAR.init());
 //!
 //!     let mut guard = VAR.lock().unwrap();
 //!     assert_eq!(*guard, 123);
@@ -40,7 +44,9 @@ extern crate std;
 mod base;
 mod cell;
 mod mut_;
+mod static_;
 
 pub use base::*;
 pub use cell::*;
 pub use mut_::*;
+pub use static_::*;
