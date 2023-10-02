@@ -1,10 +1,10 @@
 //! ## Examples
 //!
-//! ## Static cell
+//! ### Static cell
 //!
 //! ```
-//! use lock_free_static::OnceCell;
-//!
+//! # use lock_free_static::OnceCell;
+//! #
 //! static VAR: OnceCell<i32> = OnceCell::new();
 //!
 //! fn main() {
@@ -13,11 +13,11 @@
 //! }
 //! ```
 //!
-//! ## Mutable static cell
+//! ### Mutable static cell
 //!
 //! ```
-//! use lock_free_static::OnceMut;
-//!
+//! # use lock_free_static::OnceMut;
+//! #
 //! static VAR: OnceMut<i32> = OnceMut::new();
 //!
 //! fn main() {

@@ -1,6 +1,6 @@
 [package]
 name = "lock-free-static"
-version = "0.1.0"
+version = "0.1.0-rc.0"
 edition = "2021"
 authors = ["Alexey Gerasev <alexey.gerasev@gmail.com>"]
 description = "Lock-free static variables"
