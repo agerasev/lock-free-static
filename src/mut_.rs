@@ -83,6 +83,10 @@ pub struct LockGuard<'a, T> {
     owner: &'a OnceMut<T>,
     value: *mut T,
 }
+
+unsafe impl<'a, T: Sync> Send for LockGuard<'a, T> {}
+unsafe impl<'a, T: Sync> Sync for LockGuard<'a, T> {}
+
 impl<'a, T> Deref for LockGuard<'a, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -94,6 +98,7 @@ impl<'a, T> DerefMut for LockGuard<'a, T> {
         unsafe { &mut *self.value }
     }
 }
+
 impl<'a, T> Drop for LockGuard<'a, T> {
     fn drop(&mut self) {
         self.owner.borrowed.store(false, Ordering::Release);

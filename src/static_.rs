@@ -24,6 +24,7 @@ impl<T, D: Deref<Target = UnsafeOnceCell<T>>, F: Fn() -> T> LockFreeStatic<T, D,
     /// Initializes the underlying cell.
     ///
     /// `true` is returned if the cell was initialized by this call.
+    #[must_use]
     pub fn init(&self) -> bool {
         self.base.set((self.ctor)()).is_ok()
     }
