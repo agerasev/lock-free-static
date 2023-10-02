@@ -40,17 +40,6 @@ impl<T> OnceCell<T> {
         self.base.get_ptr().map(|p| unsafe { &mut *p })
     }
 
-    /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
-    ///
-    /// Returns `None` if the cell is being currently initialized.
-    ///
-    /// # Panics
-    ///
-    /// If `ctor` panics, the panic is propagated to the caller, and the cell remains uninitialized.
-    pub fn get_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Result<&T, F> {
-        self.base.get_ptr_or_init(ctor).map(|p| unsafe { &*p })
-    }
-
     /// Consumes the cell, returning the wrapped value.
     ///
     /// Returns `None` if the cell was empty.
@@ -100,22 +89,24 @@ mod tests {
     }
 
     #[test]
-    fn get_or_init() {
+    fn set_with() {
         let cell = OnceCell::<i32>::new();
 
-        assert_eq!(*cell.get_or_init(|| 123).ok().unwrap(), 123);
-        assert_eq!(*cell.get_or_init(|| 321).ok().unwrap(), 123);
+        assert!(cell.set_with(|| 123).is_ok());
+        assert_eq!(*cell.get().unwrap(), 123);
+        assert!(cell.set_with(|| 321).is_err());
+        assert_eq!(*cell.get().unwrap(), 123);
     }
 
     #[test]
-    fn get_or_init_panic() {
+    fn set_with_panic() {
         extern crate std;
         use std::panic::catch_unwind;
 
         let cell = OnceCell::<i32>::new();
 
         assert_eq!(
-            *catch_unwind(|| cell.get_or_init(|| panic!("abc")))
+            *catch_unwind(|| cell.set_with(|| panic!("abc")))
                 .err()
                 .unwrap()
                 .downcast::<&'static str>()

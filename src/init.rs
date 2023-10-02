@@ -1,38 +1,34 @@
-use crate::{OnceCell, OnceMut, UnsafeOnceCell};
+use crate::UnsafeOnceCell;
 use core::ops::Deref;
 
+/// Convenience wrapper for static initialization of cells.
+///
+/// Should be explicitly initialized (by [`init`](LockFreeStatic::init) call) because
+/// initialization is fallible and therefore cannot be done automatically on dereference.
 pub struct LockFreeStatic<T, D: Deref<Target = UnsafeOnceCell<T>>> {
     base: D,
     ctor: fn() -> T,
 }
-
+impl<T, D: Deref<Target = UnsafeOnceCell<T>>> Deref for LockFreeStatic<T, D> {
+    type Target = D;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
 impl<T, D: Deref<Target = UnsafeOnceCell<T>>> LockFreeStatic<T, D> {
+    /// Creates a new wrapper.
     pub const fn new(base: D, ctor: fn() -> T) -> Self {
         Self { base, ctor }
     }
+    /// Initializes the underlying cell.
+    ///
+    /// The cell is initialized by this call if `true` returned.
     pub fn init(&self) -> bool {
         self.base.set((self.ctor)()).is_ok()
     }
 }
 
-impl<T> LockFreeStatic<T, OnceCell<T>> {
-    pub fn get_or_init(&self) -> Option<&T> {
-        self.base.get_or_init(self.ctor).ok()
-    }
-    pub fn get(&self) -> Option<&T> {
-        self.base.get()
-    }
-}
-
-impl<T> LockFreeStatic<T, OnceMut<T>> {
-    pub fn get_mut_or_init(&self) -> Option<&mut T> {
-        self.base.get_mut_or_init(self.ctor).ok()
-    }
-    pub fn get_mut(&self) -> Option<&mut T> {
-        self.base.get_mut()
-    }
-}
-
+/// Convenience macro for creating lock-free statics.
 #[macro_export]
 macro_rules! lock_free_static {
     ($(#[$attr:meta])* $vis:vis static $ident:ident: $ty:ty = $expr:expr; $($next:tt)*) => {
@@ -91,10 +87,12 @@ mod tests {
 
     #[test]
     fn multiple() {
-        assert_eq!(*ONE.get_or_init().unwrap(), 1);
-        assert_eq!(*ONE.get_or_init().unwrap(), 1);
-        assert_eq!(*TWO.get_mut_or_init().unwrap(), 2);
-        assert!(TWO.get_mut_or_init().is_none());
+        assert!(ONE.init());
+        assert!(TWO.init());
+        assert_eq!(*ONE.get().unwrap(), 1);
+        assert_eq!(*ONE.get().unwrap(), 1);
+        assert_eq!(*TWO.get_mut().unwrap(), 2);
+        assert!(TWO.get_mut().is_none());
     }
 
     mod outer {
@@ -108,7 +106,9 @@ mod tests {
 
     #[test]
     fn visibility() {
-        assert_eq!(*outer::ONE.get_or_init().unwrap(), 1);
-        assert_eq!(*outer::TWO.get_mut_or_init().unwrap(), 2);
+        assert!(outer::ONE.init());
+        assert!(outer::TWO.init());
+        assert_eq!(*outer::ONE.get().unwrap(), 1);
+        assert_eq!(*outer::TWO.get_mut().unwrap(), 2);
     }
 }

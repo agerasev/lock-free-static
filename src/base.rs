@@ -44,12 +44,32 @@ impl<T> UnsafeOnceCell<T> {
     /// Sets the contents of this cell to `value`.
     ///
     /// Returns `Ok(())` if the cell’s value was set by this call.
-    ///
-    /// The cell is guaranteed to contain a value when `set` returns `Ok(())`.
     pub fn set(&self, value: T) -> Result<(), T> {
         if self.lock.swap(true, Ordering::AcqRel) {
             Err(value)
         } else {
+            let slot = unsafe { &mut *self.slot.get() };
+            *slot = MaybeUninit::new(value);
+            self.init.store(true, Ordering::Release);
+            Ok(())
+        }
+    }
+
+    /// Sets the contents of this cell to value returned by `ctor` call.
+    ///
+    /// If `ctor` is called only if the cell’s value is going set by this call. Otherwice `ctor` returned in `Err(..)`.
+    ///
+    /// # Panics
+    ///
+    /// If `ctor` panics, the panic is propagated to the caller, and the cell remains uninitialized.
+    pub fn set_with<F: FnOnce() -> T>(&self, ctor: F) -> Result<(), F> {
+        if self.lock.swap(true, Ordering::AcqRel) {
+            Err(ctor)
+        } else {
+            let unlock = Defer::new(|| self.lock.store(false, Ordering::Release));
+            let value = ctor();
+            forget(unlock);
+
             let slot = unsafe { &mut *self.slot.get() };
             *slot = MaybeUninit::new(value);
             self.init.store(true, Ordering::Release);
@@ -65,33 +85,6 @@ impl<T> UnsafeOnceCell<T> {
             Some(self.slot.get() as *mut T)
         } else {
             None
-        }
-    }
-
-    /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
-    ///
-    /// Returns `None` if the cell is being currently initialized.
-    ///
-    /// # Panics
-    ///
-    /// If `ctor` panics, the panic is propagated to the caller, and the cell remains uninitialized.
-    pub fn get_ptr_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Result<*mut T, F> {
-        if self.lock.swap(true, Ordering::AcqRel) {
-            if self.init.load(Ordering::Acquire) {
-                Ok(self.slot.get() as *mut T)
-            } else {
-                Err(ctor)
-            }
-        } else {
-            let unlock = Defer::new(|| self.lock.store(false, Ordering::Release));
-            let value = ctor();
-            forget(unlock);
-
-            let slot = unsafe { &mut *self.slot.get() };
-            *slot = MaybeUninit::new(value);
-            self.init.store(true, Ordering::Release);
-
-            Ok(slot as *mut _ as *mut T)
         }
     }
 

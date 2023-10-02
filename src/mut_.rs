@@ -35,7 +35,7 @@ impl<T> OnceMut<T> {
     ///
     /// The main difference from [`OnceCell::get_mut`](`crate::OnceCell::get_mut`) is that `self` is taken as immutable.
     ///
-    /// After this call returns `Some(...)`, all subsequent calls will return `None`, and there is no way to obtain mutable reference again.
+    /// After this call returns `Some(..)`, all subsequent calls will return `None`, and there is no way to obtain mutable reference again.
     pub fn get_mut(&self) -> Option<&mut T> {
         if self.borrowed.swap(true, Ordering::AcqRel) {
             None
@@ -45,29 +45,6 @@ impl<T> OnceMut<T> {
                 None => {
                     self.borrowed.store(false, Ordering::Release);
                     None
-                }
-            }
-        }
-    }
-
-    /// Gets the contents of the cell, initializing it with `ctor` if the cell was empty.
-    ///
-    /// Returns `None` if the cell is being currently initialized.
-    ///
-    /// See [`get_mut`](Self::get_mut) for more details.
-    ///
-    /// # Panics
-    ///
-    /// If `ctor` panics, the panic is propagated to the caller, and the cell remains uninitialized.
-    pub fn get_mut_or_init<F: FnOnce() -> T>(&self, ctor: F) -> Result<&mut T, F> {
-        if self.borrowed.swap(true, Ordering::AcqRel) {
-            Err(ctor)
-        } else {
-            match self.base.get_ptr_or_init(ctor) {
-                Ok(ptr) => Ok(unsafe { &mut *ptr }),
-                Err(ctor) => {
-                    self.borrowed.store(false, Ordering::Release);
-                    Err(ctor)
                 }
             }
         }
@@ -91,6 +68,13 @@ impl<T> OnceMut<T> {
                 }
             }
         }
+    }
+
+    /// Consumes the cell, returning the wrapped value.
+    ///
+    /// Returns `None` if the cell was empty.
+    pub fn into_inner(mut self) -> Option<T> {
+        self.take()
     }
 }
 
