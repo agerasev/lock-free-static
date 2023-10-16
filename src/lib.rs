@@ -41,12 +41,12 @@
 #[cfg(any(test, doc))]
 extern crate std;
 
-mod base;
-mod cell;
-mod mut_;
+mod mutex;
+mod once_cell;
+mod once_mut;
 mod static_;
 
-pub use base::*;
-pub use cell::*;
-pub use mut_::*;
+pub use mutex::*;
+pub use once_cell::*;
+pub use once_mut::*;
 pub use static_::*;

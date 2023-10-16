@@ -1,26 +1,40 @@
-use crate::UnsafeOnceCell;
+use crate::{OnceCell, OnceMut};
 use core::ops::Deref;
 
 /// Convenience wrapper for static initialization of cells.
 ///
 /// Should be explicitly initialized (by [`init`](LockFreeStatic::init) call) because
 /// initialization is fallible and therefore cannot be done automatically on dereference.
-pub struct LockFreeStatic<T, D: Deref<Target = UnsafeOnceCell<T>>, F: Fn() -> T = fn() -> T> {
+pub struct LockFreeStatic<T, D, F: Fn() -> T = fn() -> T> {
     base: D,
     ctor: F,
 }
-impl<T, D: Deref<Target = UnsafeOnceCell<T>>, F: Fn() -> T> Deref for LockFreeStatic<T, D, F> {
+
+impl<T, D, F: Fn() -> T> Deref for LockFreeStatic<T, D, F> {
     type Target = D;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
-impl<T, D: Deref<Target = UnsafeOnceCell<T>>, F: Fn() -> T> LockFreeStatic<T, D, F> {
+
+impl<T, D, F: Fn() -> T> LockFreeStatic<T, D, F> {
     /// Creates a new wrapper.
     pub const fn new(base: D, ctor: F) -> Self {
         Self { base, ctor }
     }
+}
 
+impl<T, F: Fn() -> T> LockFreeStatic<T, OnceCell<T>, F> {
+    /// Initializes the underlying cell.
+    ///
+    /// `true` is returned if the cell was initialized by this call.
+    #[must_use]
+    pub fn init(&self) -> bool {
+        self.base.set((self.ctor)()).is_ok()
+    }
+}
+
+impl<T, F: Fn() -> T> LockFreeStatic<T, OnceMut<T>, F> {
     /// Initializes the underlying cell.
     ///
     /// `true` is returned if the cell was initialized by this call.
